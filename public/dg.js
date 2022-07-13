@@ -44,34 +44,35 @@ export class Entity{
         this.dead = false;
 
         this.team = team;
-        this.team.push(this);
 
         this.name = name;
+        this.scene = scene;
 
         var geometry;
-        var mesh;
         loader.load(model,function(geo){
             geometry = geo;
-            const NG_OK_material = new THREE.MeshPhongMaterial( {color: 0xFF00FF} );
-            mesh = new THREE.Mesh(geo, NG_OK_material);
-        });
+        });    
+        this.geometry = geometry;
 
         window.setTimeout(function(){
-            const NG_OK_material = new THREE.MeshPhongMaterial( {color: 0xFF00FF} );
-            var mesh = new THREE.Mesh(geometry, NG_OK_material);
-            mesh.receiveShadow = true;
-            mesh.castShadow = true;
-            mesh.rotateX(-1.5708);
+            const NG_OK_material = new THREE.MeshPhongMaterial( {color: team.color} );
+            this.mesh = new THREE.Mesh(geometry, NG_OK_material);
+            this.mesh.receiveShadow = true;
+            this.mesh.castShadow = true;
+            this.mesh.rotateX(-1.5708);
             let r = coords[0] == 0 ? 80 : 145;
             let d = -15 + 30*coords[1];
             let threeDCoords = [Math.cos(toRadians(d))*r,10, Math.sin(toRadians(d))*r]
-            mesh.position.set(threeDCoords[0],5,threeDCoords[2]);
+            console.log(threeDCoords);
+            this.mesh.position.set(threeDCoords[0],5,threeDCoords[2]);
             let axis = new THREE.Vector3(0,0,1 );
-            mesh.rotateOnAxis(axis,toRadians(90-d));
-            scene.add(mesh);
-        },100);
+            this.mesh.rotateOnAxis(axis,toRadians(90-d));
+         //   scene.add(this.mesh);
+            this.team.join(this);
 
-        this.mesh = mesh;
+        }.bind(this),100);
+        
+     
         //radius (y displacement) of inner orbit: 65.42 or 80 units
         //radius (y displacement) of outer orbit: 124.69 units
     }
@@ -278,17 +279,24 @@ export class Guardian extends Entity{
         //make sure nothing is in between this.coords and coords
         if( this.b.get([this.coords[0],Math.min(this.coords[1],coords[1])+1]) != 0  ){
             return false;
-        return true;
+        }
+            return true;
     }
 }
 
-class Team{
-    constructor(name,color){
+export class Team{
+    constructor(name,color,characters){
         this.name = name;
         this.color = color;
         this.group = new THREE.Group();
+        this.members = [];
+        this.characters = characters;
     }
-
+    
+    join(member){   
+        this.members.push(member);
+        this.characters.add(member.mesh);
+    }
 }
 /*
 const b = new Board();
@@ -309,6 +317,9 @@ const GrimtaashTheMolator = new Guardian([0,0],team2,"GrimtaashTheMolator");
 
 
 //movement debugged: predator, brute ,scout, guardian
+
+
+
 //attack debugged: brute,predator, scout, guardian
 
 //keeps track of active team
