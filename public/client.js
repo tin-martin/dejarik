@@ -6,15 +6,15 @@ import { RenderPass } from './jsm/postprocessing/RenderPass.js';
 import { ShaderPass } from './jsm/postprocessing/ShaderPass.js';
 import { PixelShader } from './jsm/shaders/PixelShader.js';
 import Stats from './jsm/libs/stats.module.js'
-import {Board,Entity, Brute, Predator, Scout, Guardian} from './public/dg.js';
+import {Board,Entity, Brute, Predator, Scout, Guardian, Team} from './public/dg.js';
 
 
 const scene = new THREE.Scene();
 var texture0 = new THREE.TextureLoader().load( '/images/background.jpeg' );
 scene.background = texture0;
 
-const axesHelper = new THREE.AxesHelper(500);
-scene.add( axesHelper );
+//const axesHelper = new THREE.AxesHelper(500);
+//scene.add( axesHelper );
 
 const light1 = new THREE.AmbientLight( 0xFFFFFF,0.6);
 const color = 0xFFFFFF;
@@ -34,12 +34,12 @@ light2.shadow.camera.near = 0.5;
 
 scene.add(light1);
 scene.add(light2);
-const helper = new THREE.DirectionalLightHelper( light2, 3);
-scene.add( helper );
+//const helper = new THREE.DirectionalLightHelper( light2, 3);
+//scene.add( helper );
 
 let camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 3000 );
 
-const cameraHelper = new THREE.CameraHelper(light2.shadow.camera);
+//const cameraHelper = new THREE.CameraHelper(light2.shadow.camera);
 //scene.add(cameraHelper);
 
 const renderer = new THREE.WebGLRenderer()
@@ -58,14 +58,14 @@ composer.addPass( new RenderPass( scene, camera ) );
 ////////////////////////////////////////////////////////////
 
 var pixelPass = new ShaderPass( PixelShader );
-pixelPass.uniforms[ 'pixelSize' ].value = 6;
+pixelPass.uniforms[ 'pixelSize' ].value = 1;//6;
 pixelPass.uniforms[ 'resolution' ].value = new THREE.Vector2( window.innerWidth, window.innerHeight );
 pixelPass.uniforms[ 'resolution' ].value.multiplyScalar( window.devicePixelRatio );
 composer.addPass( pixelPass );
 
 const controls = new OrbitControls(camera, renderer.domElement)
 controls.enableDamping = false
-//controls.enableZoom = false;
+controls.enableZoom = false;
 camera.position.set(250*1.5,70*1.5, 0);
 controls.update();
 controls.maxPolarAngle =1.28;
@@ -80,9 +80,11 @@ materials.push(texture2);
 const geometry = new THREE.CylinderGeometry( 190, 190, 10, 100 );
 
 const cylinder = new THREE.Mesh( geometry,materials);
+
 cylinder.position.set(0,0,0);
 
 scene.add( cylinder );
+
 const shadow_material = new THREE.ShadowMaterial();
 shadow_material.opacity = 0.5;
 const shadow_cylinder = new THREE.Mesh( geometry,shadow_material);
@@ -96,10 +98,6 @@ const geometry1 = new THREE.BoxBufferGeometry(50,50, 50);
 // create a default (white) Basic material
 const material1 = new THREE.MeshPhongMaterial({color: 0xfab47B});
 // create a Mesh containing the geometry and material
-const characters = new THREE.Group();
-
-
-
 
 
 
@@ -112,8 +110,10 @@ function toRadians (angle) {
 }
 const b = new Board();
 
-let team1 = [];
-let team2 = [];
+const characters = new THREE.Group();
+
+let team1 = new Team("team1",0xFF0000,characters);
+let team2 = new Team("team2",0x0000FF,characters);
 const loader = new STLLoader();
 //team1
 
@@ -131,43 +131,8 @@ const KLorSlug = new Predator([1,0],team2,"KLorSlug","images/K_LOR_SLUG.stl",b,s
 const Ghhhk = new Scout([1,1],team2,"Ghhhk","images/Ghhhk.stl",b,scene);
 const GrimtaashTheMolator = new Guardian([0,0],team2,"GrimtaashTheMolator",'images/grimtaash.stl',b,scene);
 
+scene.add(characters);
 /*
-loader.load(
-    'images/K_LOR_SLUG.stl',
-    function (geometry) {
-        
-        const NG_OK_material = new THREE.MeshPhongMaterial( {color: 0xFF00FF} );
-        const mesh = new THREE.Mesh(geometry, NG_OK_material);
-        mesh.receiveShadow = true;
-        mesh.castShadow = true;
-        mesh.rotateX(-1.5708);
-
-        //radius (y displacement) of inner orbit: 65.42 or 80 units
-        //radius (y displacement) of outer orbit: 124.69 units
-        //
-        const r = 145;
-        let x = Math.cos(toRadians(15))*r;
-        let z = Math.sin(toRadians(15))*r;
-        console.log(x,z);
-        mesh.position.set(x,5,z);
-        const b = new THREE.Vector3(0,0,1 );
-        mesh.rotateOnAxis(b,toRadians(90-15));
-        
-        light2.target.position.set(0,5,75.664);
-        
-       
-        characters.add(mesh);
-        //scene.add(mesh);
-       
-    },
-    (xhr) => {
-        console.log((xhr.loaded / xhr.total) * 100 + '% loaded')
-    },
-    (error) => {
-        console.log(error)
-    }
-)
-
 scene.add(characters);
 console.log(scene.children);
 window.addEventListener('resize', onWindowResize, false)
@@ -183,27 +148,121 @@ document.body.appendChild(stats.dom);
   
 
 const raycaster = new THREE.Raycaster();
+//const rayHelper = new THREE.CameraHelper(raycaster.frustum.camera);
+//scene.add(rayHelper);
 const pointer = new THREE.Vector2();
 var pickedObject = null;
 var pickedObjectMaterial = null;
+
+//centered on 0,0
+function isInCircle(r,x,z){
+    //equation of circle: r^2 = x^2 + y^2
+ // console.log(x,y);
+
+    var z_max = Math.abs( Math.sqrt(Math.pow(r,2)-Math.pow(x,2)) );
+    var z_min = -z_max;
+    var x_max = Math.abs( Math.sqrt(Math.pow(r,2)-Math.pow(z,2)) );;
+    var x_min = -x_max;
+    if(z_max > z && z > z_min && x_max > x && x > x_min){
+        return true;
+    }
+    return false;
+}
+
+var mouse_x;
+var mouse_y;
+
 window.addEventListener('mousemove', function(event){
+  //for the characters
     pointer.x = ( event.clientX / window.innerWidth ) * 2 - 1;
 	pointer.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
     // cast a ray through the frustum
     raycaster.setFromCamera(pointer, camera);
     // get the list of objects the ray intersected
-    var intersectedObjects = raycaster.intersectObjects(characters.children,true);
-    if(intersectedObjects[0] != pickedObject && pickedObject != null){
-        pickedObject.material = pickedObjectMaterial;
+    var intersectedObjects = raycaster.intersectObjects(scene.children,true);
+    //ring radii: 31.45,99.35,150
+    if(intersectedObjects.length != 0){
+        if(intersectedObjects[0].object == cylinder){
+          
+            //if hits dejarik, return
+            var x = JSON.parse(JSON.stringify(intersectedObjects[0].point.x));
+            var y = JSON.parse(JSON.stringify(intersectedObjects[0].point.y));
+            var z = JSON.parse(JSON.stringify(intersectedObjects[0].point.z));
+            if(isInCircle(40,z,x)){
+                return;
+            }
+           
+             //if y coord is not 5 (rounded to nearest int) return <-- means it hits the side
+           // if(Math.round(y) != 5){
+           //     return;
+           // } 
+            //check which orbit
+            if(isInCircle(125,z,x)){
+               
+                mouse_x = 0;
+            }else {
+                mouse_x = 1;
+       
+            }
+            //angles are clockwise
+            //check angle 
+            var r = Math.sqrt(Math.pow(x,2)+Math.pow(z,2));
+            //  sin(angle)
+            // r^2 = x^2 + y^2
+            var angle = toDegrees(Math.asin(z/r));
+            //q1
+            if(z > 0 && x > 0){
+              
+
+            }else if(z < 0 && x > 0){
+                //q2
+           
+                angle = 90*3 + (90 + angle);
+            }else if(z < 0 && x < 0){
+                //q3
+            
+                angle = 180 + Math.abs(angle);
+            }else{
+                //q4
+              
+                angle = 90 + (90 - angle);
+            }
+            for(var i=0;i<12;i++){
+                if(i*30 < angle && angle < 30+i*30){
+                    if(i == 11){
+                        mouse_y = 0;
+                    }else{
+                        mouse_y = i+1;
+                    }
+                    break;
+                }
+            }
+            console.log(mouse_x,",",mouse_y);
+           /* if(mouse_x == 1 && mouse_y == 0){
+                var texture1 = new THREE.TextureLoader().load( '/images/1-1.jpg' );
+                materials[1] = new THREE.MeshStandardMaterial({ map: texture1 });
+            }*/
+             
+            }
+        }else{
+            if(intersectedObjects[0] != pickedObject && pickedObject != null){
+                pickedObject.material = pickedObjectMaterial;
+            }
+
+            if(intersectedObjects.length >= 1){
+                // pick the first object. It's the closest one
+                //pickedObject is a mesh dum dum not a friggen Entity obj
+                pickedObject = intersectedObjects[0].object;
+                pickedObjectMaterial = pickedObject.material;
+                pickedObject.material = new THREE.MeshPhongMaterial( {color: 0x990000} );
+              //  console.log(pickedObject.translateX(50));
+            }  
+        }
     }
-    if(intersectedObjects.length >= 1){
-        // pick the first object. It's the closest one
-        pickedObject = intersectedObjects[0].object;
-        pickedObjectMaterial = pickedObject.material;
-        pickedObject.material = new THREE.MeshPhongMaterial( {color: 0x990000} );
-    }
-  }
-  );
+  
+);
+
+
 
 function animate() {
     requestAnimationFrame(animate)
@@ -213,6 +272,7 @@ function animate() {
     render()
 
     stats.update()
+   
 }
 
 function render() {
