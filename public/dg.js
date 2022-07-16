@@ -32,12 +32,14 @@ export class Board{
 }
 
 export class Entity{
-    constructor(coords, team,name,model,b,scene){
+    constructor(coords, team,name,model,b,scene,outlinePass){
+        this.outlinePass = outlinePass;
+       
         // [ray, orbit]
         this.scene = scene;
         this.b = b;
         this.coords = coords;
-  
+        console.log(this.coords);
         this.b.set(this.coords,this);
         //for the Brute's attack 
         this.moved = false;
@@ -55,28 +57,44 @@ export class Entity{
         this.geometry = geometry;
 
         window.setTimeout(function(){
-            const NG_OK_material = new THREE.MeshPhongMaterial( {color: team.color} );
-            this.mesh = new THREE.Mesh(geometry, NG_OK_material);
+           // var hi = new THREE.TextureLoader().load( '/images/hololol.jpg');
+          //  const NG_OK_material = new THREE.MeshPhongMaterial( {map:hi} ) ;
+           //  
+           const material = new THREE.MeshPhongMaterial( {color:team.color} ) ;
+            this.mesh = new THREE.Mesh(geometry, material);
             this.mesh.receiveShadow = true;
             this.mesh.castShadow = true;
             this.mesh.rotateX(-1.5708);
-            let r = coords[0] == 0 ? 80 : 145;
-            let d = -15 + 30*coords[1];
-            let threeDCoords = [Math.cos(toRadians(d))*r,10, Math.sin(toRadians(d))*r]
-            console.log(threeDCoords);
-            this.mesh.position.set(threeDCoords[0],5,threeDCoords[2]);
-            let axis = new THREE.Vector3(0,0,1 );
-            this.mesh.rotateOnAxis(axis,toRadians(90-d));
+            //
+            this.mesh.scale.set(0.8,0.8,0.8);
+            this.setPos(coords);
+            //
          //   scene.add(this.mesh);
             this.team.join(this);
+            this.scene.add(this.mesh);
+        
+            this.outlinePass.selectedObjects.push(this.mesh);
 
-        }.bind(this),100);
+        }.bind(this),1000);
         
      
         //radius (y displacement) of inner orbit: 65.42 or 80 units
         //radius (y displacement) of outer orbit: 124.69 units
     }
-
+    setPos(coords, iCoords=null){
+        let r = coords[0] == 0 ? 80 : 145;
+        let d = -15 + 30*coords[1];
+        let threeDCoords = [Math.cos(toRadians(d))*r,10, Math.sin(toRadians(d))*r]
+        this.mesh.position.set(threeDCoords[0],5,threeDCoords[2]);
+        let axis = new THREE.Vector3(0,0,1 );
+        if(iCoords != null){
+            let iD = -15 + 30*iCoords[1];
+            this.mesh.rotateOnAxis(axis,toRadians( -(90-iD)  ));
+        }
+         // 
+        this.mesh.rotateOnAxis(axis,toRadians(90-d));
+      
+    }
     rayDist(coords1,coords2){
         return coords1[0] == coords2[0] ? 0 : 1;
     }
@@ -84,8 +102,12 @@ export class Entity{
         return Math.min(Math.abs(coords1[1] - coords2[1]), Math.abs(12-Math.max(coords1[1],coords2[1])+ Math.min(coords1[1],coords2[1])) );
     }
     diagonalDist(coords1,coords2){
-        if(coords1[0] == 1 ^ coords2[0] == 1){
-            if( Math.min(coords1[1],coords2[1])+1 == Math.max(coords1[1],coords2[1]) ||  Math.max(coords1[1],coords2[1])-1 == Math.min(coords1[1],coords2[1])  ){
+        //console.log(coords1,coords2);
+       //console.log("fuck off");
+        if(coords1[0] != coords2[0]){
+     
+            if(this.orbitDist(coords1,coords2)==1){
+                
                 return 1;
             }
         }
@@ -105,63 +127,70 @@ export class Entity{
         return true;
     }
     move(coords){
-        if(this.isLegalMove(coords)){
-            this.b.set(this.coords,0);
-            this.b.set(coords,this);
-            this.moved = true;  
-            return true;
-        }
-        return false;
+        this.setPos(coords,this.coords);
+        this.b.set(this.coords,0);
+        this.b.set(coords,this);
+        this.moved = true; 
+        this.coords = coords; 
+        return true;
     }
     attack(coords){
-        if(this.isLegalAttack(coords)){
-            let attacked = this.b.get(coords);
-            if(attacked != 0){
-                attacked.isDead() = true;
-                this.b.set(coords,this);
-                this.moved = true;  
-                return true;
-            }
+        this.setPos(coords,this.coords);
+        let attacked = this.b.get(coords);
+        if(attacked != 0){
+            attacked.isDead();
+            this.b.set(coords,this);
+            this.moved = true;  
+            this.coords = coords;
+            return true;
         }
-        return false;
     }
     isDead(){
         this.dead = true;
-        this.team.remove(this);
+        this.scene.remove(this.mesh);
+        console.log("someone died");
+        //this.remove();
+       // this.team.remove(this);
     }
   }
   
   
 export class Brute extends Entity{
     isLegalMove(coords){
-        if(coords instanceof Entity){
-            coords = coords.coords;
-        }
         if(!super.isLegalMove(coords)){
             return false;
         }
-        if( ( (this.rayDist(this.coords,coords) == 1 && this.coords[1] == coords[1]) ^ this.orbitDist(this.coords,coords) == 1 ) || this.diagonalDist(this.coords,coords) == 1){
+        if(  (this.rayDist(this.coords,coords) == 1 && this.orbitDist(this.coords,coords) == 0)  || this.orbitDist(this.coords,coords) == 1 || this.diagonalDist(this.coords,coords) == 1){
             return true;
         }else if(this.coords[0] == 1 && coords[0] == 1 && (this.coords[1]+6 == coords[1] || this.coords[1]-6 == coords[1]) ){
             return true;
         }
+        console.log("-");
         return false;
     }
 
     isLegalAttack(coords){
+        /*
         if(coords instanceof Entity){
             coords = coords.coords;
         }
+        */
+       console.log(this.coords);
         if(!super.isLegalAttack(coords)){
+            console.log("F");
             return false;
         }
         if(this.b.get(coords).moved == false){
-           
+            console.log("cannot attack hasnt moved");
             return false;
         }
-        if(this.diagonalDist(this.coords,coords) == 1){
+        if(  (this.rayDist(this.coords,coords) == 1 && this.orbitDist(this.coords,coords) == 0)  || this.orbitDist(this.coords,coords) == 1 || this.diagonalDist(this.coords,coords) == 1){
             return true;
         }
+        console.log(this.rayDist(this.coords,coords) == 1 && this.orbitDist(this.coords,coords) == 0);
+        console.log(this.orbitDist(this.coords,coords) == 1 );
+        console.log(this.diagonalDist(this.coords,coords) == 1);
+        console.log("Ffff");
         return false;
     }
 }
@@ -228,9 +257,11 @@ export class Scout extends Entity{
         //This piece can move off the start point and back again.
     }
     isLegalAttack(coords){
+     /*
         if(coords instanceof Entity){
             coords = coords.coords;
         }
+        */
         if(!super.isLegalAttack(coords)){
             return false;
         }
@@ -285,35 +316,22 @@ export class Guardian extends Entity{
 }
 
 export class Team{
-    constructor(name,color,characters){
+    constructor(name,color){
         this.name = name;
         this.color = color;
         this.group = new THREE.Group();
         this.members = [];
-        this.characters = characters;
+     
     }
     
     join(member){   
         this.members.push(member);
-        this.characters.add(member.mesh);
+     
     }
 }
+
+
 /*
-const b = new Board();
-
-let team1 = [];
-let team2 = [];
-//team1
-const KintanStrider = new Brute([0,7+2],team1,"KintanStrider",b); 
-const NgOk = new Predator([1,6],team1,"NgOk",b);
-const Houjix = new Scout([0,6],team1,"Houjix");
-const Monnok = new Guardian([1,7],team1,"Monnok");
-
-//team2, clockwise asignment of indices for orbitsfkyea
-const MantellianSavrip = new Brute([0,1],team2,"MantellianSavrip");
-const KLorSlug = new Predator([1,0],team2,"KLorSlug");
-const Ghhhk = new Scout([1,1],team2,"Ghhhk");
-const GrimtaashTheMolator = new Guardian([0,0],team2,"GrimtaashTheMolator");
 
 
 //movement debugged: predator, brute ,scout, guardian
@@ -331,13 +349,24 @@ let team1Counter = 3;
 let team2Counter = 3;
 
 
-function action(attackChaining=false){
+function action(coordX, coordY,attackChaining=false){
     //replace all this shtuff with mouse pointing action !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     // ACOUNT FOR ANIMATION AND GRPAHICS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    let coordX = int(input('Enter x-coordinate: '));
-    let coordY = int(input('Enter y-coordinate: '));
+    //coordX, coordY replaced by mouse_x, mouse_y
 
-    if(action == "M" && !attackChaining){
+    if( entity.attack([coordX,coordY]) ){
+        //attack
+         //restart sudden death
+        if(entity.team.length == 1){
+            if(team1 == entity.team){
+                team1counter = 3;
+            }else{
+                team2counter =3;
+            }
+        }
+        action(true);
+    }else if( entity.move([coordX,coordY]) ){
+        //move
         if(!entity.attack([coordX,coordY])){
             console.log("you can't do it and u screed it all up");
         }
@@ -350,20 +379,10 @@ function action(attackChaining=false){
                 team2counter -= 1;
             }
         }
-    }else if(action == "A"){
-        if(!entity.move([coordX,coordY])){
-           console.log("YOU PIECE AAO U MESSED IT UP IJEOIJRIW");
-        }
-
-        //restart sudden death
-        if(entity.team.length == 1){
-            if(team1 == entity.team){
-                team1counter = 3;
-            }else{
-                team2counter =3;
-            }
-        }
-        action(true);
+    }else{
+        console.log("you can't do it and u screed it all up");
+        action(attackChaining);
+    }   
         //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     }
 }
