@@ -5,7 +5,10 @@ import { EffectComposer } from './jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from './jsm/postprocessing/RenderPass.js';
 import { ShaderPass } from './jsm/postprocessing/ShaderPass.js';
 import { PixelShader } from './jsm/shaders/PixelShader.js';
+import { VignetteShader} from './jsm/shaders/VignetteShader.js';
+import { OutlinePass} from './jsm/postprocessing/OutlinePass.js';
 import Stats from './jsm/libs/stats.module.js'
+
 import {Board,Entity, Brute, Predator, Scout, Guardian, Team} from './public/dg.js';
 
 
@@ -42,7 +45,9 @@ let camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHe
 //const cameraHelper = new THREE.CameraHelper(light2.shadow.camera);
 //scene.add(cameraHelper);
 
-const renderer = new THREE.WebGLRenderer()
+const renderer = new THREE.WebGLRenderer();
+
+
 renderer.outputEncoding = THREE.sRGBEncoding
 renderer.setSize(window.innerWidth, window.innerHeight)
 renderer.setPixelRatio( window.devicePixelRatio )
@@ -50,25 +55,33 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.shadowMap.enabled = true;
 
 document.body.appendChild(renderer.domElement);
-document.body.appendChild(renderer.domElement)
+document.body.appendChild(renderer.domElement);
 
 
 var composer = new EffectComposer( renderer );
 composer.addPass( new RenderPass( scene, camera ) );
+const outlinePass = new OutlinePass(new THREE.Vector2(window.innerWidth, window.innerHeight), scene, camera);
+outlinePass.visibleEdgeColor = new THREE.Color( 0.5, 1, 1 );
+composer.addPass( outlinePass );
+
 ////////////////////////////////////////////////////////////
 
 var pixelPass = new ShaderPass( PixelShader );
-pixelPass.uniforms[ 'pixelSize' ].value = 1;//6;
+pixelPass.uniforms[ 'pixelSize' ].value = 3;//6;
 pixelPass.uniforms[ 'resolution' ].value = new THREE.Vector2( window.innerWidth, window.innerHeight );
 pixelPass.uniforms[ 'resolution' ].value.multiplyScalar( window.devicePixelRatio );
 composer.addPass( pixelPass );
+//chicken
+var a = new ShaderPass(VignetteShader );
+composer.addPass( a );
 
 const controls = new OrbitControls(camera, renderer.domElement)
 controls.enableDamping = false
 controls.enableZoom = false;
-camera.position.set(250*1.5,70*1.5, 0);
+//0.5 is scale (smaller number means closer)
+camera.position.set(250*1.25,70*1.25, 0);
 controls.update();
-controls.maxPolarAngle =1.28;
+controls.maxPolarAngle = 1.28;
 
 var texture1 = new THREE.TextureLoader().load( '/images/board.jpg' );
 const texture2 = new THREE.MeshPhongMaterial( {color: 0xffffff} );
@@ -110,28 +123,31 @@ function toRadians (angle) {
 }
 const b = new Board();
 
-const characters = new THREE.Group();
+//const characters = new THREE.Group();
 
-let team1 = new Team("team1",0xFF0000,characters);
-let team2 = new Team("team2",0x0000FF,characters);
+let team1 = new Team("team1",0xFF0000);
+let team2 = new Team("team2",0x0000FF);
+
+var activeTeam = team2;
+//for sudden death
+let team1Counter = 3;
+let team2Counter = 3;
+
 const loader = new STLLoader();
 //team1
+const KintanStrider = new Brute([0,6],team1,"KintanStrider","images/kintan_strider.stl",b,scene,outlinePass); 
 
-const KintanStrider = new Brute([0,7],team1,"KintanStrider","images/kintan_strider.stl",b,scene); 
-
-const NgOk = new Predator([1,6],team1,"NgOk","images/NG_OK.stl",b,scene);
-///sfdfdsfds
-const Houjix = new Scout([0,6],team1,"Houjix","images/Houjix.stl",b,scene);
-const Monnok = new Guardian([1,7],team1,"Monnok","images/monnok.stl",b,scene);
+const NgOk = new Predator([1,7],team1,"NgOk","images/NG_OK.stl",b,scene,outlinePass);
+const Houjix = new Scout([0,7],team1,"Houjix","images/Houjix.stl",b,scene,outlinePass);
+const Monnok = new Guardian([1,6],team1,"Monnok","images/monnok.stl",b,scene,outlinePass);
 
 //team2, clockwise asignment of indices for orbitsfkyea
+const MantellianSavrip = new Brute([0,0],team2,"MantellianSavrip","images/Mantellian_Savrip.stl",b,scene,outlinePass);
+const KLorSlug = new Predator([1,1],team2,"KLorSlug","images/K_LOR_SLUG.stl",b,scene,outlinePass);
+const Ghhhk = new Scout([1,0],team2,"Ghhhk","images/Ghhhk.stl",b,scene,outlinePass);
+const GrimtaashTheMolator = new Guardian([0,1],team2,"GrimtaashTheMolator",'images/grimtaash.stl',b,scene,outlinePass);
 
-const MantellianSavrip = new Brute([0,1],team2,"MantellianSavrip","images/Mantellian_Savrip.stl",b,scene);
-const KLorSlug = new Predator([1,0],team2,"KLorSlug","images/K_LOR_SLUG.stl",b,scene);
-const Ghhhk = new Scout([1,1],team2,"Ghhhk","images/Ghhhk.stl",b,scene);
-const GrimtaashTheMolator = new Guardian([0,0],team2,"GrimtaashTheMolator",'images/grimtaash.stl',b,scene);
 
-scene.add(characters);
 /*
 scene.add(characters);
 console.log(scene.children);
@@ -154,6 +170,7 @@ const pointer = new THREE.Vector2();
 var pickedObject = null;
 var pickedObjectMaterial = null;
 
+
 //centered on 0,0
 function isInCircle(r,x,z){
     //equation of circle: r^2 = x^2 + y^2
@@ -171,11 +188,82 @@ function isInCircle(r,x,z){
 
 var mouse_x;
 var mouse_y;
+var entity_orbit;
+var entity_ray;
 
-window.addEventListener('mousemove', function(event){
-  //for the characters
+function canAttackChain(entity){
+    //enemy coords [coordX,coordY]
+    for(let i=0;i<2;i++){
+        for(let j=0;j<12;j++){
+            let enemy = b.get([i,j]);
+            if(entity.isLegalAttack([i,j])){
+                if(enemy.team != activeTeam){
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+function action(coordX, coordY,entity){
+  //  action(entity_orbit,entity_ray,pickedObject);
+    if(entity.team != activeTeam){
+        console.log("Not your turn",activeTeam.name);
+        return;
+    }
+    //replace all this shtuff with mouse pointing action !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    // ACOUNT FOR ANIMATION AND GRPAHICS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    //coordX, coordY replaced by mouse_x, mouse_y
+
+    if(entity.isLegalAttack([coordX,coordY])){
+       
+        console.log(b.get([coordX,coordY]));
+        console.log(entity);
+        console.log("-------");
+        entity.attack([coordX,coordY]);
+        //attack
+        //restart sudden death
+        if(entity.team.length == 1){
+            if(team1 == entity.team){
+                team1Counter = 3;
+            }else{
+                team2Counter = 3;
+            }
+        }
+        if(!canAttackChain(entity)){
+            activeTeam = activeTeam == team1 ? team2 : team1;
+        }
+    }else if(entity.isLegalMove([coordX,coordY]) ){
+        //move
+        console.log(b.get([coordX,coordY]));
+        console.log(entity);
+        console.log("-------");
+        entity.move([coordX,coordY]);
+        //for sudden death;
+        if(entity.team.length == 1){
+            if(team1 == entity.team){
+                team1Counter -= 1;
+            }else{
+                team2Counter -= 1;
+            }
+        }
+      
+        activeTeam = activeTeam == team1 ? team2 : team1;
+    }else{
+        console.log("Invalid");
+        console.group(b.get([coordX,coordY]));
+    }   
+   
+        //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+}
+
+
+
+
+window.addEventListener('mousedown', function(event){
+    //for the characters
     pointer.x = ( event.clientX / window.innerWidth ) * 2 - 1;
-	pointer.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+    pointer.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
     // cast a ray through the frustum
     raycaster.setFromCamera(pointer, camera);
     // get the list of objects the ray intersected
@@ -185,13 +273,12 @@ window.addEventListener('mousemove', function(event){
         if(intersectedObjects[0].object == cylinder){
           
             //if hits dejarik, return
-            var x = JSON.parse(JSON.stringify(intersectedObjects[0].point.x));
-            var y = JSON.parse(JSON.stringify(intersectedObjects[0].point.y));
-            var z = JSON.parse(JSON.stringify(intersectedObjects[0].point.z));
+            var x = intersectedObjects[0].point.x;
+            var y = intersectedObjects[0].point.y;
+            var z = intersectedObjects[0].point.z;
             if(isInCircle(40,z,x)){
                 return;
             }
-           
              //if y coord is not 5 (rounded to nearest int) return <-- means it hits the side
            // if(Math.round(y) != 5){
            //     return;
@@ -212,19 +299,14 @@ window.addEventListener('mousemove', function(event){
             var angle = toDegrees(Math.asin(z/r));
             //q1
             if(z > 0 && x > 0){
-              
-
             }else if(z < 0 && x > 0){
                 //q2
-           
                 angle = 90*3 + (90 + angle);
             }else if(z < 0 && x < 0){
                 //q3
-            
                 angle = 180 + Math.abs(angle);
             }else{
                 //q4
-              
                 angle = 90 + (90 - angle);
             }
             for(var i=0;i<12;i++){
@@ -237,30 +319,81 @@ window.addEventListener('mousemove', function(event){
                     break;
                 }
             }
-            console.log(mouse_x,",",mouse_y);
-           /* if(mouse_x == 1 && mouse_y == 0){
-                var texture1 = new THREE.TextureLoader().load( '/images/1-1.jpg' );
-                materials[1] = new THREE.MeshStandardMaterial({ map: texture1 });
-            }*/
-             
+            console.log(mouse_x,mouse_y);
+            if(pickedObject != null){
+                action(mouse_x, mouse_y,pickedObject);
             }
+          
         }else{
+            intersectedObjects = raycaster.intersectObjects(scene.children,true);
             if(intersectedObjects[0] != pickedObject && pickedObject != null){
                 pickedObject.material = pickedObjectMaterial;
             }
-
+            
             if(intersectedObjects.length >= 1){
                 // pick the first object. It's the closest one
                 //pickedObject is a mesh dum dum not a friggen Entity obj
-                pickedObject = intersectedObjects[0].object;
-                pickedObjectMaterial = pickedObject.material;
-                pickedObject.material = new THREE.MeshPhongMaterial( {color: 0x990000} );
-              //  console.log(pickedObject.translateX(50));
+                
+
+                var x = intersectedObjects[0].point.x;
+                var y = intersectedObjects[0].point.y;
+                var z = intersectedObjects[0].point.z;
+                if(isInCircle(40,z,x)){
+                    return;
+                }
+                //if y coord is not 5 (rounded to nearest int) return <-- means it hits the side
+            // if(Math.round(y) != 5){
+            //     return;
+            // } 
+                //check which orbit
+                if(isInCircle(125,z,x)){
+                    entity_orbit = 0;
+                }else {
+                    entity_orbit = 1;
+        
+                }
+                //angles are clockwise
+                //check angle 
+                var r = Math.sqrt(Math.pow(x,2)+Math.pow(z,2));
+                //  sin(angle)
+                // r^2 = x^2 + y^2
+                var angle = toDegrees(Math.asin(z/r));
+                //q1
+                if(z > 0 && x > 0){
+                }else if(z < 0 && x > 0){
+                    //q2
+                    angle = 90*3 + (90 + angle);
+                }else if(z < 0 && x < 0){
+                    //q3
+                    angle = 180 + Math.abs(angle);
+                }else{
+                    //q4
+                    angle = 90 + (90 - angle);
+                }
+                for(var i=0;i<12;i++){
+                    if(i*30 < angle && angle < 30+i*30){
+                        if(i == 11){
+                            entity_ray = 0;
+                        }else{
+                            entity_ray = i+1;
+                        }
+                        break;
+                    }
+                }
+
+              //  var pickedMesh = intersectedObjects[0].object;
+               // pickedMesh.material = new THREE.MeshPhongMaterial( {color: 0x999900} );
+               // console.log(entity_orbit,entity_ray);
+                let temp = b.grid[entity_orbit][entity_ray];
+                if(temp.team == activeTeam){
+                    pickedObject = b.grid[entity_orbit][entity_ray];
+                }else if(pickedObject != null){ 
+                    action(entity_orbit,entity_ray,pickedObject);
+                }
             }  
         }
     }
-  
-);
+  });
 
 
 
