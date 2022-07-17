@@ -27,7 +27,7 @@ export class Board{
         return this.grid[coords[0]][coords[1]];
     }
     print(){
-        console.log(JSON.stringify(this.grid));
+        (JSON.stringify(this.grid));
     }
 }
 
@@ -39,7 +39,7 @@ export class Entity{
         this.scene = scene;
         this.b = b;
         this.coords = coords;
-        console.log(this.coords);
+        (this.coords);
         this.b.set(this.coords,this);
         //for the Brute's attack 
         this.moved = false;
@@ -58,22 +58,25 @@ export class Entity{
 
         window.setTimeout(function(){
            // var hi = new THREE.TextureLoader().load( '/images/hololol.jpg');
-          //  const NG_OK_material = new THREE.MeshPhongMaterial( {map:hi} ) ;
-           //  
-           const material = new THREE.MeshPhongMaterial( {color:team.color} ) ;
+           const material = new THREE.MeshPhongMaterial( {color:team.color } ) ;
             this.mesh = new THREE.Mesh(geometry, material);
-            this.mesh.receiveShadow = true;
-            this.mesh.castShadow = true;
+           // this.mesh.receiveShadow = true;
+           this.mesh.castShadow = true;
             this.mesh.rotateX(-1.5708);
             //
-            this.mesh.scale.set(0.8,0.8,0.8);
+            if(this instanceof Brute){
+                this.mesh.scale.set(0.65,0.65,0.65);
+            }else{
+                this.mesh.scale.set(0.8,0.8,0.8);
+            }
+            
             this.setPos(coords);
             //
          //   scene.add(this.mesh);
             this.team.join(this);
             this.scene.add(this.mesh);
         
-            this.outlinePass.selectedObjects.push(this.mesh);
+          this.outlinePass.selectedObjects.push(this.mesh);
 
         }.bind(this),1000);
         
@@ -102,14 +105,11 @@ export class Entity{
         return Math.min(Math.abs(coords1[1] - coords2[1]), Math.abs(12-Math.max(coords1[1],coords2[1])+ Math.min(coords1[1],coords2[1])) );
     }
     diagonalDist(coords1,coords2){
-        //console.log(coords1,coords2);
-       //console.log("fuck off");
-        if(coords1[0] != coords2[0]){
-     
-            if(this.orbitDist(coords1,coords2)==1){
-                
-                return 1;
-            }
+        //(coords1,coords2);
+       
+        if(coords1[0] != coords2[0] && this.orbitDist(coords1,coords2) == 1){
+       
+            return 1;
         }
         return -1;
     }
@@ -135,6 +135,7 @@ export class Entity{
         return true;
     }
     attack(coords){
+        this.b.set(this.coords,0);
         this.setPos(coords,this.coords);
         let attacked = this.b.get(coords);
         if(attacked != 0){
@@ -148,7 +149,8 @@ export class Entity{
     isDead(){
         this.dead = true;
         this.scene.remove(this.mesh);
-        console.log("someone died");
+        this.team.members.pop(this);
+        ("someone died");
         //this.remove();
        // this.team.remove(this);
     }
@@ -165,7 +167,7 @@ export class Brute extends Entity{
         }else if(this.coords[0] == 1 && coords[0] == 1 && (this.coords[1]+6 == coords[1] || this.coords[1]-6 == coords[1]) ){
             return true;
         }
-        console.log("-");
+        ("-");
         return false;
     }
 
@@ -175,22 +177,22 @@ export class Brute extends Entity{
             coords = coords.coords;
         }
         */
-       console.log(this.coords);
+       (this.coords);
         if(!super.isLegalAttack(coords)){
-            console.log("F");
+            ("F");
             return false;
         }
         if(this.b.get(coords).moved == false){
-            console.log("cannot attack hasnt moved");
+            ("cannot attack hasnt moved");
             return false;
         }
         if(  (this.rayDist(this.coords,coords) == 1 && this.orbitDist(this.coords,coords) == 0)  || this.orbitDist(this.coords,coords) == 1 || this.diagonalDist(this.coords,coords) == 1){
             return true;
         }
-        console.log(this.rayDist(this.coords,coords) == 1 && this.orbitDist(this.coords,coords) == 0);
-        console.log(this.orbitDist(this.coords,coords) == 1 );
-        console.log(this.diagonalDist(this.coords,coords) == 1);
-        console.log("Ffff");
+        (this.rayDist(this.coords,coords) == 1 && this.orbitDist(this.coords,coords) == 0);
+        (this.orbitDist(this.coords,coords) == 1 );
+        (this.diagonalDist(this.coords,coords) == 1);
+        ("Ffff");
         return false;
     }
 }
@@ -203,7 +205,10 @@ export class Predator extends Entity{
         if(!super.isLegalMove(coords)){
             return false;
         }
-        if(this.rayDist(this.coords,coords) == 1 ^ this.orbitDist(this.coords,coords) == 2){
+        if(this.rayDist(this.coords,coords) == 1 && this.orbitDist(this.coords,coords) == 0){
+            return true;
+        }
+        if(this.orbitDist(this.coords,coords) == 2 && this.rayDist(this.coords,coords) == 0){
             return true;
         }
         return false;
@@ -245,12 +250,13 @@ export class Scout extends Entity{
         if(coords == this.coords){
             return true;
         }
-        
+    
         if(this.diagonalDist(this.coords,coords) == 1){
             return true;
-        }
-        
-        else if(this.orbitDist(this.coords,coords) == 2){
+        }else if(this.orbitDist(this.coords,coords) == 2 && this.rayDist(this.coords,coords) == 0){
+            if(this.b.get([this.coords[0],Math.max(this.coords[1],coords[1])-1]) != 0){
+                return false;
+            }
             return true;
         }
         return false;
@@ -304,29 +310,31 @@ export class Guardian extends Entity{
             return false;
         }
         //2 spaces in Orbit.
-        if(this.orbitDist(this.coords,coords) != 2 || this.coords[0] != coords[0]){
-            return false;
+        if(this.orbitDist(this.coords,coords) == 2 && this.rayDist(this.coords,coords) == 0){
+            return true;
         }
         //make sure nothing is in between this.coords and coords
-        if( this.b.get([this.coords[0],Math.min(this.coords[1],coords[1])+1]) != 0  ){
-            return false;
-        }
-            return true;
+
     }
 }
 
 export class Team{
-    constructor(name,color){
+    constructor(name,color,colorWhenSelected){
         this.name = name;
         this.color = color;
         this.group = new THREE.Group();
         this.members = [];
-     
+        this.colorWhenSelected = colorWhenSelected;
+        this.counter = 3;
     }
     
     join(member){   
         this.members.push(member);
      
+    }
+
+    contains(member){
+        return member in this.members;
     }
 }
 
@@ -368,7 +376,7 @@ function action(coordX, coordY,attackChaining=false){
     }else if( entity.move([coordX,coordY]) ){
         //move
         if(!entity.attack([coordX,coordY])){
-            console.log("you can't do it and u screed it all up");
+            ("you can't do it and u screed it all up");
         }
 
         //for sudden death;
@@ -380,7 +388,7 @@ function action(coordX, coordY,attackChaining=false){
             }
         }
     }else{
-        console.log("you can't do it and u screed it all up");
+        ("you can't do it and u screed it all up");
         action(attackChaining);
     }   
         //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
