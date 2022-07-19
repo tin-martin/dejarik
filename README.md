@@ -3,7 +3,11 @@ Using three.js, I made Holochess, implementing the Galaxy's Edge rule set. The 3
 
 Demo Video:
 
-[![Watch the video]([http://img.youtube.com/vi/wiWxFHbbxi0/0.jpg](http://img.youtube.com/vi/duAgpOFM_10/0.jpg))
+[![Watch the video](https://img.youtube.com/vi/duAgpOFM_10/0.jpg)](https://www.youtube.com/watch?v=duAgpOFM_10)
+
+
+
+
 
 
 
